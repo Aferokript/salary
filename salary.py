@@ -1,54 +1,83 @@
-def get_salary(work):
+def get_salary_sj():
     languages = ['Python', 'Java', 'JavaScript', 'Ruby', 'PHP', 'C++', 'C#', 'Go']
-    url = 'https://career.habr.com/api/frontend/vacancies'
     result = {}
 
     for lang in languages:
-        params = {'q': lang}
-        response = requests.get(f'https://career.habr.com/api/frontend/vacancies', params=params)
-        response.raise_for_status()
-        vacancies = response.json()
-        vacancies_list = vacancies['list']
-        vacancies_found = vacancies['meta']['totalResults']
-        salaries = predict_rub_salary(vacancies_list)
-        processed = len(salaries)
-        average_salary = sum(salaries) / processed if processed else 0
-
-        vacancies_list = []
         page = 0
-        pages_number = vacancies['meta']['totalPages']
+        all_vacancies = []
+        count_per_page = 100
+        headers = {'X-Api-App-Id': SECRET_KEY}
+        total_found = 0
 
-        while page < pages_number:
-            page_response = requests.get(url, params={'page': page})
-            page_response.raise_for_status()
-            page_payload = page_response.json()
-            page_payload = page_payload['list']
-            vacancies_list.extend(page_payload)
+        while True:
+            params = {
+                'keyword': lang,
+                'town': 4,
+                'page': page,
+                'count': count_per_page
+            }
+
+            response = requests.get(SUPER_JOB_URL, headers=headers, params=params)
+            data = response.json()
+
+            if page == 0:
+                total_found = data.get('total', 0)
+
+            objects = data.get('objects', [])
+
+            if not objects:
+                break
+
+            all_vacancies.extend(objects)
+
+            if len(objects) < count_per_page:
+                break
 
             page += 1
 
+        salaries = []
+        for vacancy in all_vacancies:
+            payment_from = vacancy.get('payment_from')
+            payment_to = vacancy.get('payment_to')
+
+            if not payment_from and not payment_to:
+                continue
+
+            if payment_from and payment_to:
+                pred = (payment_from + payment_to) / 2
+            elif payment_from:
+                pred = payment_from * 1.2
+            elif payment_to:
+                pred = payment_to * 0.8
+            else:
+                continue
+
+            salaries.append(pred)
+
+        processed = len(salaries)
+        avg = sum(salaries) / processed if processed > 0 else 0
+
         result[lang] = {
-            "vacancies_found": vacancies_found,
-            "vacancies_processed": salaries,
-            "average_salary": average_salary
+            "vacancies_found": total_found,
+            "vacancies_processed": processed,
+            "average_salary": int(avg)
         }
+
     return result
 
-
-work = get_work()
-
+v = get_salary_sj()
 
 
+def print_table(table):
+    title = 'superjob_moscow'
 
+    table_data = (
+        ('languages', 'vacancies_found', 'vacancies_processed', 'average_salary'),
+    )
+    table = AsciiTable(table_data)
+    print(table.table)
 
-
-
-
-
-
-
-
-
+print_table(v)
 
 
 
