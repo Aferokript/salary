@@ -70,24 +70,14 @@ v = get_salary_sj()
 
 def print_table(vacancies):
     title = 'superjob_moscow'
-    for vacancy in vacancies:
-        languages = vacancy.get('languages', [])
-        vacancies_found = vacancy.get('vacancies_found', 0)
-        vacancies_processed = vacancy.get('vacancies_processed', 0)
-        average_salary = vacancy.get('average_salary', 0)
-
-
     table_data = (
         ('languages', 'vacancies_found', 'vacancies_processed', 'average_salary'),
-        (languages, vacancies_found, vacancies_processed, average_salary),
     )
-    table = AsciiTable(table_data)
+    table = AsciiTable(table_data, title)
     print(table.table)
 
 
 
-
 print_table(v)
-
 
 
