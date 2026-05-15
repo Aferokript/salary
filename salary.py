@@ -4,76 +4,85 @@ import os
 from terminaltables import AsciiTable
 
 
-load_dotenv()
+def count_salary(vacancies):
+    all_vacancies = []
+    for vacancy in vacancies:
+        salary = vacancy.get('salary')
+        if not salary:
+            continue
+        if salary.get('currency') != 'rur':
+            continue
+        salary_from = salary.get('from')
+        salary_to = salary.get('to')
 
-SECRET_KEY = os.environ['SECRET_KEY']
-HH_URL = 'https://career.habr.com/api/frontend/vacancies'
-SUPER_JOB_URL = 'https://api.superjob.ru/2.0/vacancies/'
+        if salary_from and salary_to:
+            pred = (salary_from + salary_to) / 2
+            all_vacancies.append(pred)
+        elif salary_from:
+            pred = salary_from * 1.2
+            all_vacancies.append(pred)
+        elif salary_to:
+            pred = salary_to * 0.8
+            all_vacancies.append(pred)
+        else:
+            continue
+    return all_vacancies
 
 
-def hh_statistics():
+def create_table(results, title):
+    table_data = [
+        ('Языки программирования', 'Вакансий найдено', 'Обработано вакансий', 'Примерная зарплата')
+    ]
+    for lang, result in results.items():
+        vacancies_found = result['vacancies_found']
+        vacancies_processed = result['vacancies_processed']
+        average_salary = result['average_salary']
+        table_data.append((lang, vacancies_found, vacancies_processed, average_salary))
+    table = AsciiTable(table_data, title)
+    return (table.table)
+
+
+def get_hh_statistics(HH_URL):
     languages = ['Python', 'Java', 'JavaScript', 'Ruby', 'PHP', 'C++', 'C#', 'Go']
-    results = {}
+    salary_data = {}
 
     for lang in languages:
-        vacancies_list = []
+        vacancies = []
         response = requests.get(HH_URL, params={'q': lang, 'locations[]': 'r_14068'})
+        response.raise_for_status()
         data = response.json()
-        vacancies_list.extend(data['list'])
+        vacancies.extend(data['list'])
         vacancies_found = data['meta']['totalResults']
         pages_number = data['meta']['totalPages']
 
         page = 1
         while page < pages_number:
             response = requests.get(HH_URL, params={'q': lang, 'page': page})
+            response.raise_for_status()
             data = response.json()
-            vacancies_list.extend(data['list'])
+            vacancies.extend(data['list'])
             page += 1
 
-        salaries = []
-        for vacancy in vacancies_list:
-            salary = vacancy.get('salary')
-            if not salary:
-                continue
-            if salary.get('currency') != 'rur':
-                continue
-            salary_from = salary.get('from')
-            salary_to = salary.get('to')
+        salaries = count_salary(vacancies)
+        vacancies_processed = len(salaries)
+        average_salary = sum(salaries) / vacancies_processed if vacancies_processed else None
 
-            if salary_from and salary_to:
-                pred = (salary_from + salary_to) / 2
-            elif salary_from:
-                pred = salary_from * 1.2
-            elif salary_to:
-                pred = salary_to * 0.8
-            else:
-                continue
-            salaries.append(pred)
-
-        processed = len(salaries)
-        avg = sum(salaries) / processed if processed > 0 else 0
-        results[lang] = {
+        salary_data[lang] = {
             "vacancies_found": vacancies_found,
-            "vacancies_processed": processed,
-            "average_salary": int(avg)
+            "vacancies_processed": vacancies_processed,
+            "average_salary": int(average_salary)
         }
         title = 'Head Hunter Moscow'
-        table_data = [
-            ('Языки программирования', 'Вакансий найдено', 'Обработано вакансий', 'Примерная зарплата')
-        ]
-        for lang, result in results.items():
-            vacancies_found = result['vacancies_found']
-            vacancies_processed = result['vacancies_processed']
-            average_salary = result['average_salary']
-            table_data.append((lang, vacancies_found, vacancies_processed, average_salary))
-        table = AsciiTable(table_data, title)
-    return (table.table)
+        table = create_table(salary_data, title)
+    return table
 
 
-def sj_statistics():
+def get_sj_statistics(SECRET_KEY, SUPER_JOB_URL):
     languages = ['Python', 'Java', 'JavaScript', 'Ruby', 'PHP', 'C++', 'C#', 'Go']
-    results = {}
+    salary_static = {}
     headers = {'X-Api-App-Id': SECRET_KEY}
+    moscow_code = 4
+    amount_pages = 100
 
     for lang in languages:
         page = 0
@@ -82,12 +91,13 @@ def sj_statistics():
         while True:
             params = {
                 'keyword': lang,
-                'town': 4,
+                'town': moscow_code,
                 'page': page,
-                'count': 100
+                'count': amount_pages,
             }
 
             response = requests.get(SUPER_JOB_URL, headers=headers, params=params)
+            response.raise_for_status()
             data = response.json()
 
             objects = data.get('objects', [])
@@ -101,58 +111,34 @@ def sj_statistics():
             page += 1
 
         total_found = data.get('total', 0)
-
-        salaries = []
-        for vacancy in all_vacancies:
-            payment_from = vacancy.get('payment_from')
-            payment_to = vacancy.get('payment_to')
-
-            if not payment_from and not payment_to:
-                continue
-
-            if payment_from and payment_to:
-                pred = (payment_from + payment_to) / 2
-            elif payment_from:
-                pred = payment_from * 1.2
-            elif payment_to:
-                pred = payment_to * 0.8
-            else:
-                continue
-
-            salaries.append(pred)
-
-        processed = len(salaries)
-        avg = sum(salaries) / processed if processed > 0 else 0
-
-        results[lang] = {
+        salaries = count_salary(objects)
+        vacancies_processed = len(salaries)
+        average_salary = sum(salaries) / vacancies_processed if vacancies_processed else 0
+        salary_static[lang] = {
             "vacancies_found": total_found,
-            "vacancies_processed": processed,
-            "average_salary": int(avg)
+            "vacancies_processed": vacancies_processed,
+            "average_salary": int(average_salary)
         }
-
-        title = 'SuperJob Moscow'
-        table_data = [
-            ('Языки программирования', 'Вакансий найдено', 'Обработано вакансий', 'Примерная зарплата')
-        ]
-
-        for lang, result in results.items():
-            vacancies_found = result.get('vacancies_found')
-            vacancies_processed = result.get('vacancies_processed')
-            average_salary = result.get('average_salary')
-            table_data.append((lang, vacancies_found, vacancies_processed, average_salary))
-        table = AsciiTable(table_data, title)
-    return (table.table)
+    title = 'SuperJob Moscow'
+    table = create_table(salary_static, title)
+    return table
 
 
 def main():
+    load_dotenv()
+
+    SECRET_KEY = os.environ['SECRET_KEY']
+    HH_URL = 'https://career.habr.com/api/frontend/vacancies'
+    SUPER_JOB_URL = 'https://api.superjob.ru/2.0/vacancies/'
+
     try:
-        hh_vacations = hh_statistics()
-        print(hh_vacations)
+        hh_work = get_hh_statistics(HH_URL)
+        print(hh_work)
     except requests.exceptions.RequestException as e:
         print('Ошибка на стороне сервера')
     try:
-        superjob_vacations  = sj_statistics()
-        print(superjob_vacations)
+        superjob_work = get_sj_statistics(SECRET_KEY, SUPER_JOB_URL)
+        print(superjob_work)
     except requests.exceptions.RequestException as e:
         print('Ошибка на стороне сервера')
 
