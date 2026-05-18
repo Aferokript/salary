@@ -5,7 +5,7 @@ from terminaltables import AsciiTable
 
 
 def count_salary(vacancies):
-    all_vacancies = []
+    all_salaries = []
     for vacancy in vacancies:
         salary = vacancy.get('salary')
         if not salary:
@@ -16,17 +16,17 @@ def count_salary(vacancies):
         salary_to = salary.get('to')
 
         if salary_from and salary_to:
-            pred = (salary_from + salary_to) / 2
-            all_vacancies.append(pred)
+            processed = (salary_from + salary_to) / 2
+            all_salaries.append(processed)
         elif salary_from:
-            pred = salary_from * 1.2
-            all_vacancies.append(pred)
+            processed = salary_from * 1.2
+            all_salaries.append(processed)
         elif salary_to:
-            pred = salary_to * 0.8
-            all_vacancies.append(pred)
+            processed = salary_to * 0.8
+            all_salaries.append(processed)
         else:
             continue
-    return all_vacancies
+    return all_salaries
 
 
 def create_table(results, title):
@@ -42,13 +42,13 @@ def create_table(results, title):
     return (table.table)
 
 
-def get_hh_statistics(HH_URL):
+def get_hh_statistics(hh_url):
     languages = ['Python', 'Java', 'JavaScript', 'Ruby', 'PHP', 'C++', 'C#', 'Go']
     salary_data = {}
 
     for lang in languages:
         vacancies = []
-        response = requests.get(HH_URL, params={'q': lang, 'locations[]': 'r_14068'})
+        response = requests.get(hh_url, params={'q': lang, 'locations[]': 'r_14068'})
         response.raise_for_status()
         data = response.json()
         vacancies.extend(data['list'])
@@ -57,7 +57,7 @@ def get_hh_statistics(HH_URL):
 
         page = 1
         while page < pages_number:
-            response = requests.get(HH_URL, params={'q': lang, 'page': page})
+            response = requests.get(hh_url, params={'q': lang, 'page': page})
             response.raise_for_status()
             data = response.json()
             vacancies.extend(data['list'])
@@ -70,17 +70,15 @@ def get_hh_statistics(HH_URL):
         salary_data[lang] = {
             "vacancies_found": vacancies_found,
             "vacancies_processed": vacancies_processed,
-            "average_salary": int(average_salary)
+            "average_salary": average_salary
         }
-        title = 'Head Hunter Moscow'
-        table = create_table(salary_data, title)
-    return table
+    return salary_data
 
 
-def get_sj_statistics(SECRET_KEY, SUPER_JOB_URL):
+def get_sj_statistics(secret_key, super_job_url):
     languages = ['Python', 'Java', 'JavaScript', 'Ruby', 'PHP', 'C++', 'C#', 'Go']
     salary_static = {}
-    headers = {'X-Api-App-Id': SECRET_KEY}
+    headers = {'X-Api-App-Id': secret_key}
     moscow_code = 4
     amount_pages = 100
 
@@ -96,7 +94,7 @@ def get_sj_statistics(SECRET_KEY, SUPER_JOB_URL):
                 'count': amount_pages,
             }
 
-            response = requests.get(SUPER_JOB_URL, headers=headers, params=params)
+            response = requests.get(super_job_url, headers=headers, params=params)
             response.raise_for_status()
             data = response.json()
 
@@ -119,29 +117,31 @@ def get_sj_statistics(SECRET_KEY, SUPER_JOB_URL):
             "vacancies_processed": vacancies_processed,
             "average_salary": int(average_salary)
         }
-    title = 'SuperJob Moscow'
-    table = create_table(salary_static, title)
-    return table
+    return salary_static
 
 
 def main():
     load_dotenv()
 
-    SECRET_KEY = os.environ['SECRET_KEY']
-    HH_URL = 'https://career.habr.com/api/frontend/vacancies'
-    SUPER_JOB_URL = 'https://api.superjob.ru/2.0/vacancies/'
+    secret_key = os.environ['SECRET_KEY']
+    hh_url = 'https://career.habr.com/api/frontend/vacancies'
+    super_job_url = 'https://api.superjob.ru/2.0/vacancies/'
 
     try:
-        hh_work = get_hh_statistics(HH_URL)
-        print(hh_work)
+        hh_work = get_hh_statistics(hh_url)
+        title = 'Head Hunter Moscow'
+        table = create_table(hh_work, title)
+        print(table)
+
     except requests.exceptions.RequestException as e:
         print('Ошибка на стороне сервера')
     try:
-        superjob_work = get_sj_statistics(SECRET_KEY, SUPER_JOB_URL)
-        print(superjob_work)
+        superjob_work = get_sj_statistics(secret_key, super_job_url)
+        title = 'SuperJob Moscow'
+        table = create_table(superjob_work, title)
+        print(table)
     except requests.exceptions.RequestException as e:
         print('Ошибка на стороне сервера')
 
 if __name__ == '__main__':
     main()
-
