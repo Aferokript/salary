@@ -16,14 +16,14 @@ def count_salary(vacancies):
         salary_to = salary.get('to')
 
         if salary_from and salary_to:
-            processed = (salary_from + salary_to) / 2
-            all_salaries.append(processed)
+            prediction = (salary_from + salary_to) / 2
+            all_salaries.append(prediction)
         elif salary_from:
-            processed = salary_from * 1.2
-            all_salaries.append(processed)
+            prediction = salary_from * 1.2
+            all_salaries.append(prediction)
         elif salary_to:
-            processed = salary_to * 0.8
-            all_salaries.append(processed)
+            prediction = salary_to * 0.8
+            all_salaries.append(prediction)
         else:
             continue
     return all_salaries
